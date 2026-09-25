@@ -14,6 +14,8 @@
   4. PATCH 更新 refs/heads/<branch>（默认 force=false，即要求快进）
   5. 校验：逐个比对「上传的 blob SHA」与「本地 git blob SHA」，再比对远端 tree 与本地 tree
 
+空仓库（首次推送）是单独一支：树不加 base_tree、提交不带 parent、ref 走 POST 创建。
+
 退出码：0 成功（含校验一致），1 失败。
 """
 import argparse
@@ -59,7 +61,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("repo_dir")
     ap.add_argument("--remote", default="origin")
-    ap.add_argument("--branch", default="main")
+    ap.add_argument("--branch", default=None,
+                    help="目标分支，默认取本地当前分支（不是硬编码 main —— "
+                         "本地是 master 时推 main 会推错分支）")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
@@ -67,6 +71,13 @@ def main():
     if not os.path.isdir(os.path.join(R, ".git")):
         print("!! 不是 git 仓库: %s" % R)
         return 1
+
+    # 分支：默认跟随本地当前分支
+    if not args.branch:
+        try:
+            args.branch = run(["git", "-C", R, "branch", "--show-current"]) or "main"
+        except RuntimeError:
+            args.branch = "main"
 
     # 从 remote url 推断 owner/repo
     url = run(["git", "-C", R, "remote", "get-url", args.remote])
@@ -86,11 +97,45 @@ def main():
     print("本地 HEAD : %s" % local_short)
 
     # 远端当前状态
+    # 空仓库（还没任何提交）时**整个 Git Data API 都被禁用**（git/blobs 也返回 409）。
+    # 解法：先用 Contents API PUT 一个文件做出"种子提交"，仓库随即变为非空，
+    # 剩余文件再走 Git Data API。最终内容仍以 tree 比对为准。
+    empty_repo = False
     try:
         remote_commit = gh_json(["repos/%s/commits/%s" % (slug, args.branch)])
     except RuntimeError as e:
-        print("!! 读远端 %s 失败：%s" % (args.branch, e))
-        return 1
+        msg = str(e)
+        if "409" in msg or "Git Repository is empty" in msg:
+            empty_repo = True
+            print("远端 HEAD : （空仓库，需先落种子提交）")
+        else:
+            print("!! 读远端 %s 失败：%s" % (args.branch, e))
+            return 1
+
+    if empty_repo:
+        # 挑一个文件做种子：优先 README.md / SKILL.md，让首屏有内容
+        local_paths = [p for p in
+                       run(["git", "-C", R, "ls-tree", "-r", "--name-only", local_head]).split("\n") if p]
+        if not local_paths:
+            print("!! 本地仓库没有任何文件，无法推送。")
+            return 1
+        pick = next((x for x in ("README.md", "SKILL.md") if x in local_paths), local_paths[0])
+        seed_data = run_bytes(["git", "-C", R, "cat-file", "blob", "%s:%s" % (local_head, pick)])
+        # 注意：空仓库还没有任何分支，payload 里**不能带 branch**——
+        # 带上会得到 HTTP 404（分支不存在）。省略 branch 时 GitHub 会自建默认分支。
+        seed_payload = {
+            "message": "chore: 仓库初始化（gh_push.py 种子提交）",
+            "content": base64.b64encode(seed_data).decode(),
+        }
+        fp = os.path.join(tempfile.mkdtemp(prefix="ghpush_seed_"), "seed.json")
+        with open(fp, "w", encoding="utf-8") as f:
+            json.dump(seed_payload, f)
+        gh(["repos/%s/contents/%s" % (slug, pick)], payload_path=fp, jq=".commit.sha")
+        print("种子提交  : %s（Contents API，空仓库唯一可用通道）" % pick)
+        # 仓库已非空，重新读取远端状态
+        remote_commit = gh_json(["repos/%s/commits/%s" % (slug, args.branch)])
+        empty_repo = False
+
     remote_sha = remote_commit["sha"]          # 完整 40 位
     remote_tree = remote_commit["commit"]["tree"]["sha"]
     remote_msg = remote_commit["commit"]["message"].split("\n")[0]
@@ -125,13 +170,24 @@ def main():
                 files.append((parts[0][0], parts[-1]))
     else:
         # 递归拉取远端 tree → {path: blob_sha}
+        # 注意：空树（4b825dc6…）在 GitHub 上是不存在的对象，查它会 404。
+        # 远端只剩空目录时就会走到这条路径，必须当作"没有任何文件"处理。
+        EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
         remote_files = {}
         def walk(tree_sha, prefix=""):
-            data = gh_json(["repos/%s/git/trees/%s" % (slug, tree_sha)])
+            if tree_sha == EMPTY_TREE:
+                return
+            try:
+                data = gh_json(["repos/%s/git/trees/%s" % (slug, tree_sha)])
+            except RuntimeError as e:
+                if "404" in str(e):
+                    return          # 空树 / 已不存在的对象，视为无内容
+                raise
             for e in data.get("tree", []):
                 p = prefix + e["path"]
                 if e["type"] == "tree":
-                    walk(e["sha"], p + "/")
+                    if e["sha"] != EMPTY_TREE:
+                        walk(e["sha"], p + "/")
                 elif e["type"] == "blob":
                     remote_files[p] = e["sha"]
         walk(remote_tree)
@@ -213,9 +269,10 @@ def main():
     else:
         print("\n!! tree 不一致，请检查是否有行尾/过滤规则差异。")
 
-    print("\n提示：本地与远端 SHA 不同是正常的（Git Data API 建的提交）。")
-    print("如需本地跟踪引用对齐，网络恢复后执行：")
-    print("  git fetch %s && git reset --soft %s/%s" % (args.remote, args.remote, args.branch))
+    print("\n提示：本地与远端 SHA 不同是正常的（Git Data API 建的提交，committer 信息不同）。")
+    print("     判断是否成功看 tree，不要比 commit SHA。")
+    print("     网络恢复后对齐本地跟踪引用（在此之前 fetch 不通，那条命令也跑不了）：")
+    print("       git fetch %s && git reset --soft %s/%s" % (args.remote, args.remote, args.branch))
 
     return 0 if (all_ok and new_tree == local_tree) else 1
 

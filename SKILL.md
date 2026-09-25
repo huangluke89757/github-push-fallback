@@ -42,9 +42,9 @@ python gh_push.py <repo_dir> --remote origin     # 指定远端名
 
 退出码 0 表示「每个 blob SHA 都与本地 git blob 相符，且远端 tree == 本地 tree」。
 
-## 必须知道的四个坑
+## 必须知道的八个坑
 
-这四条都实际踩过，脚本已自动处理，但排查问题时需要理解。
+这八条都实际踩过，脚本已自动处理，但排查问题时需要理解。
 
 ### ① `parents` 必须是完整 40 位 SHA
 
@@ -101,6 +101,38 @@ gh api --method PATCH repos/<owner>/<repo>/git/refs/heads/<branch> --input ref.j
 ```
 
 （同一坑：`gh api ... --jq '.content'` 读文件会被 base64 换行截断，见 ③。）
+
+### ⑥ 空仓库：整个 Git Data API 都被禁用（409）
+
+**全新的空仓库连 `git/blobs` 都会返回 409**，不只是读提交失败：
+
+```
+{"message":"Git Repository is empty.","status":"409"}
+```
+
+所以"首次推送"不能直接走 Git Data，必须先用 **Contents API** 落一个种子文件：
+
+```bash
+# payload：{"message":"...","content":"<base64>"}  —— 注意**不要带 branch 字段**
+gh api --method PUT repos/<o>/<r>/contents/README.md --input seed.json
+```
+
+**为什么不能带 `branch`**：空仓库还没有任何分支，指定 `branch: main` 会得到
+`HTTP 404 Not Found`。省略 branch 时 GitHub 会自建默认分支。
+
+种子落完仓库即非空，其余文件再走 Git Data API。脚本已内置这条分支。
+
+### ⑦ 空树对象（`4b825dc6…`）查不到，会 404
+
+远端最后一个文件被删掉后，远端 tree 会变成 git 的空树 SHA
+`4b825dc642cb6eb9a060e54bf8d69288fbee4904`。**这个对象在 GitHub 上不存在**，
+递归查它的内容会 404。脚本把 404 和空树 SHA 都当"没有任何文件"处理。
+
+### ⑧ 默认分支不能硬编码 `main`
+
+本地 Git 默认分支可能是 `master`（`git init` 在部分配置下就是这样）。
+硬编码推 `main` 会把内容推到错误的分支上，且**远端那边看起来"推成功了"**，
+不会报错——最难查的一类错误。脚本默认取 `git branch --show-current`。
 
 ## 推完之后的本地状态
 
