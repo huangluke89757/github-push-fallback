@@ -42,9 +42,9 @@ python gh_push.py <repo_dir> --remote origin     # 指定远端名
 
 退出码 0 表示「每个 blob SHA 都与本地 git blob 相符，且远端 tree == 本地 tree」。
 
-## 必须知道的八个坑
+## 必须知道的九个坑
 
-这八条都实际踩过，脚本已自动处理，但排查问题时需要理解。
+这九条都实际踩过，脚本已自动处理，但排查问题时需要理解。
 
 ### ① `parents` 必须是完整 40 位 SHA
 
