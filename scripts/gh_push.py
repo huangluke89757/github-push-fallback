@@ -96,6 +96,18 @@ def main():
     local_short = run(["git", "-C", R, "rev-parse", "--short", "HEAD"])
     print("本地 HEAD : %s" % local_short)
 
+    # 只推**已提交**的内容（本脚本推送的是 HEAD 这棵树）。
+    # 未提交的改动必须显式告知 —— 否则用户改完文件直接跑，会被静默忽略、
+    # 还误以为"推上去了"（本坑实际踩过：dry-run 报 0 差异，实推却 422）。
+    dirty = run(["git", "-C", R, "status", "--porcelain"])
+    if dirty:
+        n = len([l for l in dirty.split("\n") if l.strip()])
+        print("!! 注意    : 工作区有 %d 处未提交改动，**不会被推送**（本脚本只推 HEAD）。" % n)
+        print("             如需推送请先 git add + git commit，再重跑。")
+        for l in dirty.split("\n")[:8]:
+            if l.strip():
+                print("             %s" % l)
+
     # 远端当前状态
     # 空仓库（还没任何提交）时**整个 Git Data API 都被禁用**（git/blobs 也返回 409）。
     # 解法：先用 Contents API PUT 一个文件做出"种子提交"，仓库随即变为非空，

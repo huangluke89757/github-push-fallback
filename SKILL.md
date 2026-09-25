@@ -134,6 +134,16 @@ gh api --method PUT repos/<o>/<r>/contents/README.md --input seed.json
 硬编码推 `main` 会把内容推到错误的分支上，且**远端那边看起来"推成功了"**，
 不会报错——最难查的一类错误。脚本默认取 `git branch --show-current`。
 
+### ⑨ 只推已提交的内容，未提交改动会被静默忽略
+
+脚本推的是 **HEAD 那棵树**，不看工作区。改完文件没 commit 就跑，会出现最迷惑的组合：
+
+- `--dry-run` 报 **0 差异**（HEAD 与远端确实一致）
+- 实推时 `git/trees` 返回 **422 Invalid tree info**（blob 是旧内容的 SHA）
+
+本坑实际踩过。脚本现在会显式打印「工作区有 N 处未提交改动，不会被推送」。
+**改完文件请先 `git add && git commit`，再跑本脚本。**
+
 ## 推完之后的本地状态
 
 Git Data API 建的提交，committer/时间戳与本地不同，所以**远端 SHA ≠ 本地 SHA**（内容相同）。
