@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600">
+  <rect width="960" height="600" fill="#FAF6EF"/>
+  <g font-family="'Source Han Sans SC','PingFang SC','Microsoft YaHei',sans-serif">
+
+    <!-- ===== Zone A：两条路对比 ===== -->
+    <text x="40" y="50" font-size="22" font-weight="700" fill="#2E2A26">两条路：撞墙的常规路径 vs 走通的 gh 通道</text>
+
+    <!-- 左卡：git push 失败 -->
+    <rect x="40" y="74" width="420" height="176" rx="16" fill="#FFFFFF" stroke="#E8E2D8" stroke-width="1.5"/>
+    <text x="64" y="108" font-size="17" font-weight="700" fill="#2E2A26">常规：git push</text>
+    <rect x="64" y="124" width="286" height="38" rx="8" fill="#F3EEE6"/>
+    <text x="80" y="149" font-size="14" font-family="ui-monospace,Consolas,monospace" fill="#2E2A26">git push origin main</text>
+    <circle cx="76" cy="202" r="11" fill="#C86A5C"/>
+    <text x="72" y="207" font-size="14" font-weight="700" fill="#FFFFFF">×</text>
+    <text x="98" y="208" font-size="15" fill="#7A756E">HTTP 502 / Connection reset</text>
+
+    <!-- 右卡：gh api 走通 -->
+    <rect x="500" y="74" width="420" height="176" rx="16" fill="#FFFFFF" stroke="#3B6CB7" stroke-width="1.5"/>
+    <text x="524" y="108" font-size="17" font-weight="700" fill="#2E2A26">兜底：gh api 的 Git Data 通道</text>
+    <rect x="524" y="124" width="330" height="38" rx="8" fill="#F0F4FA"/>
+    <text x="540" y="149" font-size="14" font-family="ui-monospace,Consolas,monospace" fill="#2E2A26">python scripts/gh_push.py &lt;repo&gt;</text>
+    <circle cx="536" cy="202" r="11" fill="#4E8C7D"/>
+    <text x="532" y="207" font-size="14" font-weight="700" fill="#FFFFFF">✓</text>
+    <text x="558" y="208" font-size="15" fill="#7A756E">远端 tree == 本地 tree，退出码 0</text>
+
+    <!-- ===== Zone B：六步流水线 ===== -->
+    <text x="40" y="306" font-size="22" font-weight="700" fill="#2E2A26">gh_push.py 内部：这六步全自动</text>
+
+    <!-- 步骤 1 -->
+    <rect x="32" y="336" width="136" height="132" rx="14" fill="#FFFFFF" stroke="#E8E2D8" stroke-width="1.5"/>
+    <circle cx="56" cy="366" r="14" fill="#3B6CB7"/>
+    <text x="56" y="371" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">1</text>
+    <text x="80" y="371" font-size="16" font-weight="700" fill="#2E2A26">算差异</text>
+    <text x="48" y="414" font-size="12" fill="#7A756E">哪些文件变了</text>
+    <text x="48" y="436" font-size="12" fill="#7A756E">没网也能算</text>
+
+    <!-- 箭头 1→2 -->
+    <polygon points="172,410 180,418 172,426" fill="#C9C2B6"/>
+
+    <!-- 步骤 2 -->
+    <rect x="184" y="336" width="136" height="132" rx="14" fill="#FFFFFF" stroke="#E8E2D8" stroke-width="1.5"/>
+    <circle cx="208" cy="366" r="14" fill="#3B6CB7"/>
+    <text x="208" y="371" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">2</text>
+    <text x="232" y="371" font-size="16" font-weight="700" fill="#2E2A26">建 blob</text>
+    <text x="200" y="414" font-size="12" fill="#7A756E">取仓库里的内容</text>
+    <text x="200" y="436" font-size="12" fill="#7A756E">避开行尾污染</text>
+
+    <polygon points="324,410 332,418 324,426" fill="#C9C2B6"/>
+
+    <!-- 步骤 3 -->
+    <rect x="336" y="336" width="136" height="132" rx="14" fill="#FFFFFF" stroke="#E8E2D8" stroke-width="1.5"/>
+    <circle cx="360" cy="366" r="14" fill="#3B6CB7"/>
+    <text x="360" y="371" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">3</text>
+    <text x="384" y="371" font-size="16" font-weight="700" fill="#2E2A26">组 tree</text>
+    <text x="352" y="414" font-size="12" fill="#7A756E">挂到原树之上</text>
+    <text x="352" y="436" font-size="12" fill="#7A756E">不重建整棵树</text>
+
+    <polygon points="476,410 484,418 476,426" fill="#C9C2B6"/>
+
+    <!-- 步骤 4 -->
+    <rect x="488" y="336" width="136" height="132" rx="14" fill="#FFFFFF" stroke="#E8E2D8" stroke-width="1.5"/>
+    <circle cx="512" cy="366" r="14" fill="#3B6CB7"/>
+    <text x="512" y="371" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">4</text>
+    <text x="536" y="371" font-size="16" font-weight="700" fill="#2E2A26">建 commit</text>
+    <text x="504" y="414" font-size="12" fill="#7A756E">父子关系接对</text>
+    <text x="504" y="436" font-size="12" fill="#7A756E">SHA 补满 40 位</text>
+
+    <polygon points="628,410 636,418 628,426" fill="#C9C2B6"/>
+
+    <!-- 步骤 5 -->
+    <rect x="640" y="336" width="136" height="132" rx="14" fill="#FFFFFF" stroke="#E8E2D8" stroke-width="1.5"/>
+    <circle cx="664" cy="366" r="14" fill="#3B6CB7"/>
+    <text x="664" y="371" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">5</text>
+    <text x="688" y="371" font-size="16" font-weight="700" fill="#2E2A26">更新 ref</text>
+    <text x="656" y="414" font-size="12" fill="#7A756E">只允许快进</text>
+    <text x="656" y="436" font-size="12" fill="#7A756E">绝不强推覆盖</text>
+
+    <polygon points="780,410 788,418 780,426" fill="#C9C2B6"/>
+
+    <!-- 步骤 6 -->
+    <rect x="792" y="336" width="136" height="132" rx="14" fill="#FFFFFF" stroke="#4E8C7D" stroke-width="1.5"/>
+    <circle cx="816" cy="366" r="14" fill="#4E8C7D"/>
+    <text x="816" y="371" font-size="14" font-weight="700" fill="#FFFFFF" text-anchor="middle">6</text>
+    <text x="840" y="371" font-size="16" font-weight="700" fill="#2E2A26">校验</text>
+    <text x="808" y="414" font-size="12" fill="#7A756E">逐文件对 SHA</text>
+    <text x="808" y="436" font-size="12" fill="#7A756E">tree 全相符</text>
+
+    <!-- ===== 底部注释 ===== -->
+    <text x="40" y="516" font-size="14" fill="#7A756E">退出码 0 = 每个 blob 的 SHA 都与本地 git blob 相符，且远端 tree 与本地 tree 完全一致。</text>
+    <text x="40" y="542" font-size="14" fill="#7A756E">只快进（force 默认 false）。远端有本地没有的提交时会拒绝 —— 那说明别人推过东西，应先取回合并。</text>
+
+  </g>
+</svg>
